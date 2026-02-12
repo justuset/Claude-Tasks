@@ -25,5 +25,11 @@ export default defineNuxtConfig({
 
   ssr: false,
 
+  nitro: {
+    output: {
+      publicDir: 'dist',
+    },
+  },
+
   devtools: { enabled: false },
 })
