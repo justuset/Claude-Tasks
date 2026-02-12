@@ -43,6 +43,7 @@
   --priority-high: #cc6b6b;
 
   /* Spacing */
+  --nav-height: 44px;
   --sidebar-width: 260px;
   --input-bar-height: 72px;
   --radius-sm: 6px;

@@ -14,43 +14,52 @@ const heading = computed(() => {
   }
   return 'All Tasks'
 })
+
+const hasTasks = computed(() => taskStore.filteredTasks.length > 0 || taskStore.completedTasks.length > 0)
 </script>
 
 <template>
   <div class="task-list-container">
-    <div class="task-list-header">
-      <h2 class="task-list-title">{{ heading }}</h2>
-      <span class="task-list-count">{{ taskStore.filteredTasks.length }} tasks</span>
+    <!-- Empty / Landing state -->
+    <div v-if="!hasTasks && !taskStore.searchQuery" class="landing">
+      <EmptyState />
     </div>
 
-    <div class="task-list-scroll">
-      <EmptyState v-if="taskStore.filteredTasks.length === 0" />
+    <!-- Active tasks view with input at top -->
+    <template v-else>
+      <div class="task-list-header">
+        <h2 class="task-list-title">{{ heading }}</h2>
+        <span class="task-list-count">{{ taskStore.filteredTasks.length }} tasks</span>
+      </div>
 
-      <TransitionGroup v-else name="list" tag="div" class="task-list">
-        <TaskCard
-          v-for="task in taskStore.filteredTasks"
-          :key="task.id"
-          :task="task"
-        />
-      </TransitionGroup>
+      <div class="task-list-scroll">
+        <div v-if="taskStore.filteredTasks.length === 0 && taskStore.searchQuery" class="search-empty">
+          <p class="search-empty-text">No results for "{{ taskStore.searchQuery }}"</p>
+        </div>
 
-      <div v-if="taskStore.completedTasks.length > 0 && !taskStore.activeCategory" class="completed-section">
-        <button
-          class="completed-toggle"
-          @click="() => {}"
-        >
-          <span class="completed-label">Completed</span>
-          <span class="completed-count">{{ taskStore.completedTasks.length }}</span>
-        </button>
-        <TransitionGroup name="list" tag="div" class="task-list">
+        <TransitionGroup v-else name="list" tag="div" class="task-list">
           <TaskCard
-            v-for="task in taskStore.completedTasks.slice(0, 5)"
+            v-for="task in taskStore.filteredTasks"
             :key="task.id"
             :task="task"
           />
         </TransitionGroup>
+
+        <div v-if="taskStore.completedTasks.length > 0 && !taskStore.activeCategory" class="completed-section">
+          <button class="completed-toggle">
+            <span class="completed-label">Completed</span>
+            <span class="completed-count">{{ taskStore.completedTasks.length }}</span>
+          </button>
+          <TransitionGroup name="list" tag="div" class="task-list">
+            <TaskCard
+              v-for="task in taskStore.completedTasks.slice(0, 5)"
+              :key="task.id"
+              :task="task"
+            />
+          </TransitionGroup>
+        </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -62,11 +71,22 @@ const heading = computed(() => {
   overflow: hidden;
 }
 
+/* Landing / empty state - centered layout */
+.landing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0 24px;
+}
+
 .task-list-header {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 20px 24px 12px;
+  padding: 16px 24px 12px;
   flex-shrink: 0;
 }
 
@@ -91,6 +111,18 @@ const heading = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.search-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.search-empty-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 .completed-section {

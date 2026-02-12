@@ -1,43 +1,54 @@
 <script setup lang="ts">
+import type { Category } from '~/types/task'
+
 const taskStore = useTaskStore()
 
-const message = computed(() => {
-  if (taskStore.activeCategory) {
-    const labels: Record<string, string> = {
-      design: 'design',
-      development: 'development',
-      research: 'research',
-      meetings: 'meeting',
-      copy: 'copy',
-    }
-    return `No ${labels[taskStore.activeCategory]} tasks yet`
-  }
-  return 'No tasks yet'
-})
+interface Suggestion {
+  icon: string
+  title: string
+  category: Category
+}
 
-const subtitle = computed(() => {
-  if (taskStore.searchQuery) return 'Try a different search term'
-  return 'Add your first task below to get started'
-})
+const suggestions: Suggestion[] = [
+  { icon: '◆', title: 'Plan my designs', category: 'design' },
+  { icon: '◎', title: 'Research competitors', category: 'research' },
+  { icon: '⟨/⟩', title: 'Review codebase', category: 'development' },
+]
+
+function addSuggestion(s: Suggestion) {
+  taskStore.addTask(s.title, s.category, 'medium')
+}
 </script>
 
 <template>
   <div class="empty-state">
-    <div class="empty-mascot">
-      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-        <!-- Claude-style pixel mascot -->
-        <rect x="16" y="8" width="32" height="32" rx="4" fill="var(--accent)" opacity="0.2" />
-        <rect x="20" y="12" width="24" height="24" rx="2" fill="var(--accent)" opacity="0.35" />
-        <rect x="24" y="16" width="6" height="6" rx="1" fill="var(--accent)" />
-        <rect x="34" y="16" width="6" height="6" rx="1" fill="var(--accent)" />
-        <rect x="26" y="26" width="12" height="3" rx="1.5" fill="var(--accent)" opacity="0.6" />
-        <rect x="22" y="44" width="20" height="3" rx="1.5" fill="var(--text-muted)" opacity="0.3" />
-        <rect x="18" y="50" width="28" height="3" rx="1.5" fill="var(--text-muted)" opacity="0.2" />
-        <rect x="24" y="56" width="16" height="3" rx="1.5" fill="var(--text-muted)" opacity="0.1" />
+    <!-- Claude-style starburst icon -->
+    <div class="empty-icon">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <path
+          d="M18 2 L20 14 L32 12 L22 18 L32 24 L20 22 L18 34 L16 22 L4 24 L14 18 L4 12 L16 14 Z"
+          fill="var(--accent)"
+          opacity="0.8"
+        />
       </svg>
     </div>
-    <h3 class="empty-title">{{ message }}</h3>
-    <p class="empty-subtitle">{{ subtitle }}</p>
+
+    <h2 class="empty-headline">Let's knock something off your list</h2>
+
+    <div class="suggestions">
+      <span class="suggestions-label">Pick a task, any task</span>
+      <div class="suggestion-cards">
+        <button
+          v-for="s in suggestions"
+          :key="s.title"
+          class="suggestion-card"
+          @click="addSuggestion(s)"
+        >
+          <span class="suggestion-icon">{{ s.icon }}</span>
+          <span class="suggestion-title">{{ s.title }}</span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -45,32 +56,86 @@ const subtitle = computed(() => {
 .empty-state {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+  max-width: 540px;
+  margin-bottom: 20px;
+}
+
+.empty-icon {
+  margin-bottom: 2px;
+}
+
+.empty-headline {
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: var(--text-primary);
+  line-height: 1.3;
+  font-family: var(--font-serif);
+}
+
+.suggestions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.suggestions-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.suggestion-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.suggestion-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.suggestion-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-hover);
+}
+
+.suggestion-icon {
+  font-size: 1rem;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
-  padding: 40px 20px;
-  gap: 12px;
-  opacity: 0.9;
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
 }
 
-.empty-mascot {
-  margin-bottom: 8px;
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-
-.empty-title {
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.empty-subtitle {
+.suggestion-title {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--text-primary);
+  font-weight: 500;
+  text-align: left;
+}
+
+@media (max-width: 600px) {
+  .suggestion-cards {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

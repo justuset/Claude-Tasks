@@ -143,9 +143,4 @@ const categories = useTaskCategories()
   color: var(--text-muted);
 }
 
-@media (max-width: 768px) {
-  .sidebar {
-    display: none;
-  }
-}
 </style>

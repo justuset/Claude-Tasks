@@ -1,20 +1,31 @@
 <script setup lang="ts">
 const taskStore = useTaskStore()
+const navStore = useNavStore()
+
+const inputBarRef = ref<HTMLElement | null>(null)
+
+function handleNewTask() {
+  // Switch to tasks tab if on canvas
+  if (navStore.activeTab !== 'tasks') {
+    navStore.setTab('tasks')
+  }
+  // Focus the task input bar
+  nextTick(() => {
+    const input = document.querySelector('.task-input') as HTMLTextAreaElement | null
+    input?.focus()
+  })
+}
 </script>
 
 <template>
   <div class="sidebar-header">
-    <div class="brand">
-      <div class="brand-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="3" width="7" height="7" rx="1.5" fill="var(--accent)" opacity="0.9" />
-          <rect x="14" y="3" width="7" height="7" rx="1.5" fill="var(--accent)" opacity="0.6" />
-          <rect x="3" y="14" width="7" height="7" rx="1.5" fill="var(--accent)" opacity="0.6" />
-          <rect x="14" y="14" width="7" height="7" rx="1.5" fill="var(--accent)" opacity="0.3" />
-        </svg>
-      </div>
-      <span class="brand-name">Claude Tasks</span>
-    </div>
+    <button class="new-task-btn" @click="handleNewTask">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+      <span>New task</span>
+    </button>
     <div class="search-wrapper">
       <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8" />
@@ -23,7 +34,7 @@ const taskStore = useTaskStore()
       <input
         type="text"
         class="search-input"
-        placeholder="Search tasks..."
+        placeholder="Search"
         :value="taskStore.searchQuery"
         @input="taskStore.setSearchQuery(($event.target as HTMLInputElement).value)"
       />
@@ -33,42 +44,46 @@ const taskStore = useTaskStore()
 
 <style scoped>
 .sidebar-header {
-  padding: 16px 14px 8px;
+  padding: 12px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.brand {
+.new-task-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  transition: all var(--duration-fast) var(--ease-out);
+  cursor: pointer;
 }
 
-.brand-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.brand-name {
-  font-size: 0.95rem;
-  font-weight: 600;
+.new-task-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-hover);
   color: var(--text-primary);
-  letter-spacing: -0.01em;
 }
 
 .search-wrapper {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
+  background: transparent;
   border-radius: var(--radius-md);
-  padding: 7px 10px;
-  transition: border-color var(--duration-fast) var(--ease-out);
+  padding: 6px 10px;
+  transition: all var(--duration-fast) var(--ease-out);
 }
 
 .search-wrapper:focus-within {
-  border-color: var(--border-hover);
+  background: var(--bg-surface);
 }
 
 .search-icon {

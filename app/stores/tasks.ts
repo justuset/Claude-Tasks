@@ -87,10 +87,11 @@ export const useTaskStore = defineStore('tasks', {
       this.hydrated = true
     },
 
-    addTask(title: string, category: Category, priority: Priority = 'medium', dueDate?: string) {
+    addTask(title: string, category: Category, priority: Priority = 'medium', dueDate?: string, notes?: string) {
       const task: Task = {
         id: generateId(),
         title: title.trim(),
+        notes: notes?.trim() || '',
         category,
         priority,
         completed: false,
@@ -114,7 +115,7 @@ export const useTaskStore = defineStore('tasks', {
       saveTasks(this.tasks)
     },
 
-    updateTask(id: string, updates: Partial<Pick<Task, 'title' | 'category' | 'priority' | 'dueDate'>>) {
+    updateTask(id: string, updates: Partial<Pick<Task, 'title' | 'notes' | 'category' | 'priority' | 'dueDate'>>) {
       const task = this.tasks.find(t => t.id === id)
       if (task) {
         Object.assign(task, updates)

@@ -6,6 +6,12 @@ const props = defineProps<{
 }>()
 
 const taskStore = useTaskStore()
+const showNotes = ref(false)
+const notesValue = ref(props.task.notes || '')
+
+watch(() => props.task.notes, (v) => {
+  notesValue.value = v || ''
+})
 
 const categoryLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -33,6 +39,20 @@ const timeAgo = computed(() => {
   return new Date(props.task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 })
 
+function toggleNotes() {
+  showNotes.value = !showNotes.value
+  if (showNotes.value) {
+    nextTick(() => {
+      const el = document.querySelector(`[data-notes-id="${props.task.id}"]`) as HTMLTextAreaElement
+      el?.focus()
+    })
+  }
+}
+
+function saveNotes() {
+  taskStore.updateTask(props.task.id, { notes: notesValue.value })
+}
+
 function handleDelete() {
   taskStore.deleteTask(props.task.id)
 }
@@ -57,13 +77,39 @@ function handleDelete() {
     <div class="task-body">
       <div class="task-top-row">
         <span class="task-title">{{ task.title }}</span>
-        <button class="task-delete" @click="handleDelete" aria-label="Delete task">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <div class="task-actions">
+          <button class="task-action-btn" @click="toggleNotes" :title="showNotes ? 'Hide notes' : 'Add notes'" :class="{ 'task-action-btn--active': task.notes }">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+          </button>
+          <button class="task-action-btn task-delete" @click="handleDelete" aria-label="Delete task">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      <!-- Notes section -->
+      <div v-if="showNotes" class="task-notes">
+        <textarea
+          :data-notes-id="task.id"
+          v-model="notesValue"
+          class="notes-input"
+          placeholder="Add notes..."
+          rows="2"
+          @blur="saveNotes"
+        />
+      </div>
+      <div v-else-if="task.notes" class="task-notes-preview" @click="toggleNotes">
+        {{ task.notes.length > 80 ? task.notes.slice(0, 80) + '...' : task.notes }}
+      </div>
+
       <div class="task-meta">
         <span class="cat-tag" :class="`cat-tag--${task.category}`">
           {{ categoryLabel }}
@@ -151,20 +197,77 @@ function handleDelete() {
   word-break: break-word;
 }
 
-.task-delete {
-  color: var(--text-muted);
-  opacity: 0;
-  transition: all var(--duration-fast) var(--ease-out);
-  padding: 2px;
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   flex-shrink: 0;
 }
 
-.task-card:hover .task-delete {
+.task-action-btn {
+  color: var(--text-muted);
+  opacity: 0;
+  transition: all var(--duration-fast) var(--ease-out);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.task-card:hover .task-action-btn {
   opacity: 1;
 }
 
+.task-action-btn:hover {
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+}
+
+.task-action-btn--active {
+  opacity: 1 !important;
+  color: var(--accent);
+}
+
 .task-delete:hover {
-  color: var(--priority-high);
+  color: var(--priority-high) !important;
+}
+
+/* Notes */
+.task-notes {
+  margin-top: -2px;
+}
+
+.notes-input {
+  width: 100%;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  resize: vertical;
+  min-height: 48px;
+  max-height: 200px;
+  line-height: 1.5;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.notes-input:focus {
+  border-color: var(--border-hover);
+}
+
+.notes-input::placeholder {
+  color: var(--text-muted);
+}
+
+.task-notes-preview {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.task-notes-preview:hover {
+  color: var(--text-secondary);
 }
 
 .task-meta {

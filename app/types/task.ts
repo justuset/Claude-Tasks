@@ -5,6 +5,7 @@ export type Priority = 'low' | 'medium' | 'high'
 export interface Task {
   id: string
   title: string
+  notes: string
   category: Category
   priority: Priority
   completed: boolean
