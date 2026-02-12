@@ -1,0 +1,236 @@
+/* ========================================
+   Claude Tasks - Design Tokens & Base Styles
+   Brand: Claude AI (Anthropic)
+   ======================================== */
+
+:root {
+  /* Brand Accent */
+  --accent: #da7756;
+  --accent-hover: #c15f3c;
+  --accent-subtle: rgba(218, 119, 86, 0.12);
+  --accent-glow: rgba(218, 119, 86, 0.2);
+
+  /* Backgrounds */
+  --bg-app: #1a1815;
+  --bg-sidebar: #141413;
+  --bg-surface: #2a2725;
+  --bg-card: #232120;
+  --bg-card-hover: #2d2a28;
+  --bg-input: #1e1c1a;
+  --bg-elevated: #302d2b;
+
+  /* Text */
+  --text-primary: #e8e6e3;
+  --text-secondary: #b0aea5;
+  --text-muted: #7a7872;
+  --text-accent: #da7756;
+
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.1);
+  --border-accent: rgba(218, 119, 86, 0.3);
+
+  /* Category Colors */
+  --cat-design: #c49cde;
+  --cat-development: #6abf8a;
+  --cat-research: #6a9bcc;
+  --cat-meetings: #d4a95a;
+  --cat-copy: #cc8b8b;
+
+  /* Priority Colors */
+  --priority-low: #6abf8a;
+  --priority-medium: #d4a95a;
+  --priority-high: #cc6b6b;
+
+  /* Spacing */
+  --sidebar-width: 260px;
+  --input-bar-height: 72px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+}
+
+/* ---- Reset & Base ---- */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  line-height: 1.5;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#__nuxt {
+  height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ---- Dot Grid Background (Claude Code style) ---- */
+
+.dot-grid-bg {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ---- Category Tag Utilities ---- */
+
+.cat-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+}
+
+.cat-tag--design {
+  background: rgba(196, 156, 222, 0.12);
+  color: var(--cat-design);
+}
+
+.cat-tag--development {
+  background: rgba(106, 191, 138, 0.12);
+  color: var(--cat-development);
+}
+
+.cat-tag--research {
+  background: rgba(106, 155, 204, 0.12);
+  color: var(--cat-research);
+}
+
+.cat-tag--meetings {
+  background: rgba(212, 169, 90, 0.12);
+  color: var(--cat-meetings);
+}
+
+.cat-tag--copy {
+  background: rgba(204, 139, 139, 0.12);
+  color: var(--cat-copy);
+}
+
+/* ---- Priority Dot ---- */
+
+.priority-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.priority-dot--low { background: var(--priority-low); }
+.priority-dot--medium { background: var(--priority-medium); }
+.priority-dot--high { background: var(--priority-high); }
+
+/* ---- Transitions ---- */
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--duration-normal) var(--ease-out);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.slide-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.slide-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.list-move {
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.list-enter-active,
+.list-leave-active {
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.list-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.list-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
