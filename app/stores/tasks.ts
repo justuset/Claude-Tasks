@@ -7,7 +7,8 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 }
 
-function loadTasks(): Task[] {
+// localStorage fallback for static deploys (Netlify)
+function loadTasksLocal(): Task[] {
   if (import.meta.server) return []
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -17,9 +18,19 @@ function loadTasks(): Task[] {
   }
 }
 
-function saveTasks(tasks: Task[]) {
+function saveTasksLocal(tasks: Task[]) {
   if (import.meta.server) return
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
+}
+
+// Detect if server API is available (dev mode with Nuxt server)
+async function isApiAvailable(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/tasks', { method: 'HEAD' })
+    return res.ok || res.status === 200
+  } catch {
+    return false
+  }
 }
 
 export const useTaskStore = defineStore('tasks', {
@@ -28,6 +39,7 @@ export const useTaskStore = defineStore('tasks', {
     activeCategory: null as Category | null,
     searchQuery: '',
     hydrated: false,
+    useApi: false,
   }),
 
   getters: {
@@ -81,13 +93,43 @@ export const useTaskStore = defineStore('tasks', {
   },
 
   actions: {
-    hydrate() {
+    async hydrate() {
       if (this.hydrated) return
-      this.tasks = loadTasks()
+
+      // Try API first (dev server running), fall back to localStorage (static deploy)
+      if (!import.meta.server) {
+        this.useApi = await isApiAvailable()
+
+        if (this.useApi) {
+          try {
+            const tasks = await $fetch<Task[]>('/api/tasks')
+            this.tasks = tasks
+          } catch {
+            this.tasks = loadTasksLocal()
+            this.useApi = false
+          }
+        } else {
+          this.tasks = loadTasksLocal()
+        }
+      }
+
       this.hydrated = true
     },
 
-    addTask(title: string, category: Category, priority: Priority = 'medium', dueDate?: string, notes?: string) {
+    async addTask(title: string, category: Category, priority: Priority = 'medium', dueDate?: string, notes?: string) {
+      if (this.useApi) {
+        try {
+          const task = await $fetch<Task>('/api/tasks', {
+            method: 'POST',
+            body: { title, category, priority, dueDate, notes },
+          })
+          this.tasks.unshift(task)
+          return
+        } catch {
+          // Fall through to local
+        }
+      }
+
       const task: Task = {
         id: generateId(),
         title: title.trim(),
@@ -99,28 +141,61 @@ export const useTaskStore = defineStore('tasks', {
         dueDate,
       }
       this.tasks.unshift(task)
-      saveTasks(this.tasks)
+      saveTasksLocal(this.tasks)
     },
 
-    toggleComplete(id: string) {
+    async toggleComplete(id: string) {
       const task = this.tasks.find(t => t.id === id)
-      if (task) {
-        task.completed = !task.completed
-        saveTasks(this.tasks)
+      if (!task) return
+
+      task.completed = !task.completed
+
+      if (this.useApi) {
+        try {
+          await $fetch(`/api/tasks/${id}`, {
+            method: 'PATCH',
+            body: { completed: task.completed },
+          })
+          return
+        } catch {
+          // Already updated locally
+        }
       }
+      saveTasksLocal(this.tasks)
     },
 
-    deleteTask(id: string) {
+    async deleteTask(id: string) {
       this.tasks = this.tasks.filter(t => t.id !== id)
-      saveTasks(this.tasks)
+
+      if (this.useApi) {
+        try {
+          await $fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+          return
+        } catch {
+          // Already removed locally
+        }
+      }
+      saveTasksLocal(this.tasks)
     },
 
-    updateTask(id: string, updates: Partial<Pick<Task, 'title' | 'notes' | 'category' | 'priority' | 'dueDate'>>) {
+    async updateTask(id: string, updates: Partial<Pick<Task, 'title' | 'notes' | 'category' | 'priority' | 'dueDate'>>) {
       const task = this.tasks.find(t => t.id === id)
-      if (task) {
-        Object.assign(task, updates)
-        saveTasks(this.tasks)
+      if (!task) return
+
+      Object.assign(task, updates)
+
+      if (this.useApi) {
+        try {
+          await $fetch(`/api/tasks/${id}`, {
+            method: 'PATCH',
+            body: updates,
+          })
+          return
+        } catch {
+          // Already updated locally
+        }
       }
+      saveTasksLocal(this.tasks)
     },
 
     setActiveCategory(category: Category | null) {

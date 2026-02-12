@@ -1,0 +1,13 @@
+{
+  "name": "claude-tasks-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Claude Tasks — syncs tasks between Claude Code and the web app",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}
