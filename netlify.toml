@@ -1,7 +1,11 @@
 [build]
   command = "nuxt build"
-  publish = ".netlify/publish"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
   NITRO_PRESET = "netlify"
+
+[functions]
+  directory = ".netlify/functions-internal"
+  node_bundler = "esbuild"
