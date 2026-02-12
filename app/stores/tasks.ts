@@ -73,6 +73,18 @@ export const useTaskStore = defineStore('tasks', {
     totalCompleted(state): number {
       return state.tasks.filter(t => t.completed).length
     },
+
+    taskCountByCategory(state): Record<string, number> {
+      const active = state.tasks.filter(t => !t.completed)
+      return {
+        all: active.length,
+        design: active.filter(t => t.category === 'design').length,
+        development: active.filter(t => t.category === 'development').length,
+        research: active.filter(t => t.category === 'research').length,
+        meetings: active.filter(t => t.category === 'meetings').length,
+        copy: active.filter(t => t.category === 'copy').length,
+      }
+    },
   },
 
   actions: {
