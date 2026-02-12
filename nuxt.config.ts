@@ -2,18 +2,7 @@ export default defineNuxtConfig({
   future: { compatibilityVersion: 4 },
   compatibilityDate: '2025-01-01',
 
-  modules: ['@pinia/nuxt', '@nuxtjs/supabase'],
-
-  supabase: {
-    auth: { enabled: false },
-  },
-
-  runtimeConfig: {
-    public: {
-      supabaseUrl: process.env.SUPABASE_URL,
-      supabaseAnonKey: process.env.SUPABASE_KEY,
-    },
-  },
+  modules: ['@pinia/nuxt'],
 
   components: [
     { path: '~/components', pathPrefix: false },

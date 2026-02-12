@@ -1,28 +1,23 @@
-import { getSupabaseAdmin, rowToTask } from '~/server/utils/supabase'
+import { readTasks, writeTasks } from '~/server/utils/storage'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   const body = await readBody(event)
 
-  const rowUpdates: any = {}
-  if (body.title !== undefined) rowUpdates.title = body.title
-  if (body.notes !== undefined) rowUpdates.notes = body.notes
-  if (body.category !== undefined) rowUpdates.category = body.category
-  if (body.priority !== undefined) rowUpdates.priority = body.priority
-  if (body.completed !== undefined) rowUpdates.completed = body.completed
-  if (body.dueDate !== undefined) rowUpdates.due_date = body.dueDate
+  const tasks = await readTasks()
+  const task = tasks.find(t => t.id === id)
 
-  const supabase = getSupabaseAdmin()
-  const { data, error } = await supabase
-    .from('tasks')
-    .update(rowUpdates)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error?.code === 'PGRST116') {
+  if (!task) {
     throw createError({ statusCode: 404, statusMessage: 'Task not found' })
   }
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
-  return rowToTask(data)
+
+  if (body.title !== undefined) task.title = body.title
+  if (body.notes !== undefined) task.notes = body.notes
+  if (body.category !== undefined) task.category = body.category
+  if (body.priority !== undefined) task.priority = body.priority
+  if (body.completed !== undefined) task.completed = body.completed
+  if (body.dueDate !== undefined) task.dueDate = body.dueDate
+
+  await writeTasks(tasks)
+  return task
 })
