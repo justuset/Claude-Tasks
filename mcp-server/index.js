@@ -1,34 +1,25 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
-import { join } from 'path'
-import { homedir } from 'os'
+import { createClient } from '@supabase/supabase-js'
 
-// ── Storage ──────────────────────────────────────────────
-const TASKS_DIR = join(homedir(), '.claude-tasks')
-const TASKS_FILE = join(TASKS_DIR, 'tasks.json')
+// ── Supabase ──────────────────────────────────────────────
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY,
+)
 
-function ensureDir() {
-  if (!existsSync(TASKS_DIR)) mkdirSync(TASKS_DIR, { recursive: true })
-}
-
-function readTasks() {
-  ensureDir()
-  if (!existsSync(TASKS_FILE)) {
-    writeFileSync(TASKS_FILE, '[]', 'utf-8')
-    return []
+function rowToTask(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    notes: row.notes,
+    category: row.category,
+    priority: row.priority,
+    completed: row.completed,
+    createdAt: row.created_at,
+    dueDate: row.due_date ?? undefined,
   }
-  try {
-    return JSON.parse(readFileSync(TASKS_FILE, 'utf-8'))
-  } catch {
-    return []
-  }
-}
-
-function writeTasks(tasks) {
-  ensureDir()
-  writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2), 'utf-8')
 }
 
 function generateId() {
@@ -54,12 +45,15 @@ server.tool(
     completed: z.boolean().optional().describe('Filter by completion status (true = completed, false = active)'),
   },
   async ({ category, priority, completed }) => {
-    let tasks = readTasks()
+    let query = supabase.from('tasks').select('*').order('created_at', { ascending: false })
+    if (category) query = query.eq('category', category)
+    if (priority) query = query.eq('priority', priority)
+    if (completed !== undefined) query = query.eq('completed', completed)
 
-    if (category) tasks = tasks.filter(t => t.category === category)
-    if (priority) tasks = tasks.filter(t => t.priority === priority)
-    if (completed !== undefined) tasks = tasks.filter(t => t.completed === completed)
+    const { data, error } = await query
+    if (error) return { content: [{ type: 'text', text: `Error: ${error.message}` }] }
 
+    const tasks = (data ?? []).map(rowToTask)
     if (tasks.length === 0) {
       return { content: [{ type: 'text', text: 'No tasks found matching the filters.' }] }
     }
@@ -89,23 +83,25 @@ server.tool(
     dueDate: z.string().optional().describe('Optional due date (ISO string)'),
   },
   async ({ title, category, priority, notes, dueDate }) => {
-    const task = {
-      id: generateId(),
-      title: title.trim(),
-      notes: notes?.trim() || '',
-      category,
-      priority,
-      completed: false,
-      createdAt: new Date().toISOString(),
-      dueDate,
-    }
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        id: generateId(),
+        title: title.trim(),
+        notes: notes?.trim() || '',
+        category,
+        priority,
+        completed: false,
+        created_at: new Date().toISOString(),
+        due_date: dueDate ?? null,
+      })
+      .select()
+      .single()
 
-    const tasks = readTasks()
-    tasks.unshift(task)
-    writeTasks(tasks)
+    if (error) return { content: [{ type: 'text', text: `Error: ${error.message}` }] }
 
     return {
-      content: [{ type: 'text', text: `Task added: "${task.title}" [${category}] (${priority} priority)\nID: ${task.id}` }],
+      content: [{ type: 'text', text: `Task added: "${data.title}" [${category}] (${priority} priority)\nID: ${data.id}` }],
     }
   }
 )
@@ -118,18 +114,19 @@ server.tool(
     id: z.string().describe('Task ID to complete'),
   },
   async ({ id }) => {
-    const tasks = readTasks()
-    const task = tasks.find(t => t.id === id)
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ completed: true })
+      .eq('id', id)
+      .select()
+      .single()
 
-    if (!task) {
+    if (error || !data) {
       return { content: [{ type: 'text', text: `Task not found with ID: ${id}` }] }
     }
 
-    task.completed = true
-    writeTasks(tasks)
-
     return {
-      content: [{ type: 'text', text: `Completed: "${task.title}" ✅` }],
+      content: [{ type: 'text', text: `Completed: "${data.title}" ✅` }],
     }
   }
 )
@@ -147,23 +144,26 @@ server.tool(
     dueDate: z.string().optional().describe('New due date (ISO string)'),
   },
   async ({ id, title, notes, category, priority, dueDate }) => {
-    const tasks = readTasks()
-    const task = tasks.find(t => t.id === id)
+    const rowUpdates = {}
+    if (title !== undefined) rowUpdates.title = title.trim()
+    if (notes !== undefined) rowUpdates.notes = notes.trim()
+    if (category !== undefined) rowUpdates.category = category
+    if (priority !== undefined) rowUpdates.priority = priority
+    if (dueDate !== undefined) rowUpdates.due_date = dueDate
 
-    if (!task) {
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(rowUpdates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error || !data) {
       return { content: [{ type: 'text', text: `Task not found with ID: ${id}` }] }
     }
 
-    if (title !== undefined) task.title = title.trim()
-    if (notes !== undefined) task.notes = notes.trim()
-    if (category !== undefined) task.category = category
-    if (priority !== undefined) task.priority = priority
-    if (dueDate !== undefined) task.dueDate = dueDate
-
-    writeTasks(tasks)
-
     return {
-      content: [{ type: 'text', text: `Updated task: "${task.title}" (id: ${task.id})` }],
+      content: [{ type: 'text', text: `Updated task: "${data.title}" (id: ${data.id})` }],
     }
   }
 )
@@ -176,18 +176,17 @@ server.tool(
     id: z.string().describe('Task ID to delete'),
   },
   async ({ id }) => {
-    const tasks = readTasks()
-    const index = tasks.findIndex(t => t.id === id)
+    const { data: task } = await supabase.from('tasks').select('title').eq('id', id).single()
 
-    if (index === -1) {
+    if (!task) {
       return { content: [{ type: 'text', text: `Task not found with ID: ${id}` }] }
     }
 
-    const [removed] = tasks.splice(index, 1)
-    writeTasks(tasks)
+    const { error } = await supabase.from('tasks').delete().eq('id', id)
+    if (error) return { content: [{ type: 'text', text: `Error: ${error.message}` }] }
 
     return {
-      content: [{ type: 'text', text: `Deleted: "${removed.title}" 🗑️` }],
+      content: [{ type: 'text', text: `Deleted: "${task.title}" 🗑️` }],
     }
   }
 )
@@ -198,7 +197,10 @@ server.tool(
   'Get a summary of all tasks grouped by category with counts',
   {},
   async () => {
-    const tasks = readTasks()
+    const { data, error } = await supabase.from('tasks').select('*')
+    if (error) return { content: [{ type: 'text', text: `Error: ${error.message}` }] }
+
+    const tasks = (data ?? []).map(rowToTask)
     const active = tasks.filter(t => !t.completed)
     const completed = tasks.filter(t => t.completed)
 

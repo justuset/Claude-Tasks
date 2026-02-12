@@ -1,15 +1,14 @@
-export default defineEventHandler((event) => {
+import { getSupabaseAdmin } from '~/server/utils/supabase'
+
+export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
 
-  const tasks = readTasks()
-  const index = tasks.findIndex(t => t.id === id)
+  const supabase = getSupabaseAdmin()
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', id)
 
-  if (index === -1) {
-    throw createError({ statusCode: 404, statusMessage: 'Task not found' })
-  }
-
-  tasks.splice(index, 1)
-  writeTasks(tasks)
-
+  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
   return { success: true }
 })

@@ -1,36 +1,30 @@
 import { defineStore } from 'pinia'
+import { createClient } from '@supabase/supabase-js'
 import type { Task, Category, Priority } from '~/types/task'
-
-const STORAGE_KEY = 'claude-tasks'
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 }
 
-// localStorage fallback for static deploys (Netlify)
-function loadTasksLocal(): Task[] {
-  if (import.meta.server) return []
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
+function rowToTask(row: any): Task {
+  return {
+    id: row.id,
+    title: row.title,
+    notes: row.notes,
+    category: row.category,
+    priority: row.priority,
+    completed: row.completed,
+    createdAt: row.created_at,
+    dueDate: row.due_date ?? undefined,
   }
 }
 
-function saveTasksLocal(tasks: Task[]) {
-  if (import.meta.server) return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
-}
-
-// Detect if server API is available (dev mode with Nuxt server)
-async function isApiAvailable(): Promise<boolean> {
-  try {
-    const res = await fetch('/api/tasks', { method: 'HEAD' })
-    return res.ok || res.status === 200
-  } catch {
-    return false
-  }
+function getClient() {
+  const config = useRuntimeConfig()
+  return createClient(
+    config.public.supabaseUrl as string,
+    config.public.supabaseAnonKey as string,
+  )
 }
 
 export const useTaskStore = defineStore('tasks', {
@@ -39,7 +33,7 @@ export const useTaskStore = defineStore('tasks', {
     activeCategory: null as Category | null,
     searchQuery: '',
     hydrated: false,
-    useApi: false,
+    _channel: null as any,
   }),
 
   getters: {
@@ -95,43 +89,50 @@ export const useTaskStore = defineStore('tasks', {
   actions: {
     async hydrate() {
       if (this.hydrated) return
+      if (import.meta.server) return
 
-      // Try API first (dev server running), fall back to localStorage (static deploy)
-      if (!import.meta.server) {
-        this.useApi = await isApiAvailable()
+      const supabase = getClient()
 
-        if (this.useApi) {
-          try {
-            const tasks = await $fetch<Task[]>('/api/tasks')
-            this.tasks = tasks
-          } catch {
-            this.tasks = loadTasksLocal()
-            this.useApi = false
-          }
-        } else {
-          this.tasks = loadTasksLocal()
-        }
+      // Initial load
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (!error && data) {
+        this.tasks = data.map(rowToTask)
       }
 
       this.hydrated = true
+
+      // Realtime subscription — picks up changes from MCP, other tabs, or Netlify
+      this._channel = supabase
+        .channel('tasks-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const incoming = rowToTask(payload.new)
+            if (!this.tasks.find(t => t.id === incoming.id)) {
+              this.tasks.unshift(incoming)
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const idx = this.tasks.findIndex(t => t.id === (payload.new as any).id)
+            if (idx !== -1) {
+              this.tasks[idx] = rowToTask(payload.new)
+            }
+          } else if (payload.eventType === 'DELETE') {
+            this.tasks = this.tasks.filter(t => t.id !== (payload.old as any).id)
+          }
+        })
+        .subscribe()
     },
 
     async addTask(title: string, category: Category, priority: Priority = 'medium', dueDate?: string, notes?: string) {
-      if (this.useApi) {
-        try {
-          const task = await $fetch<Task>('/api/tasks', {
-            method: 'POST',
-            body: { title, category, priority, dueDate, notes },
-          })
-          this.tasks.unshift(task)
-          return
-        } catch {
-          // Fall through to local
-        }
-      }
+      const supabase = getClient()
+      const newId = generateId()
 
-      const task: Task = {
-        id: generateId(),
+      // Optimistic insert
+      const optimistic: Task = {
+        id: newId,
         title: title.trim(),
         notes: notes?.trim() || '',
         category,
@@ -140,62 +141,92 @@ export const useTaskStore = defineStore('tasks', {
         createdAt: new Date().toISOString(),
         dueDate,
       }
-      this.tasks.unshift(task)
-      saveTasksLocal(this.tasks)
+      this.tasks.unshift(optimistic)
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert({
+          id: newId,
+          title: optimistic.title,
+          notes: optimistic.notes,
+          category,
+          priority,
+          completed: false,
+          created_at: optimistic.createdAt,
+          due_date: dueDate ?? null,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        // Rollback optimistic insert
+        this.tasks = this.tasks.filter(t => t.id !== newId)
+      } else if (data) {
+        // Replace optimistic with confirmed row
+        const idx = this.tasks.findIndex(t => t.id === newId)
+        if (idx !== -1) this.tasks[idx] = rowToTask(data)
+      }
     },
 
     async toggleComplete(id: string) {
       const task = this.tasks.find(t => t.id === id)
       if (!task) return
 
+      // Optimistic update
       task.completed = !task.completed
 
-      if (this.useApi) {
-        try {
-          await $fetch(`/api/tasks/${id}`, {
-            method: 'PATCH',
-            body: { completed: task.completed },
-          })
-          return
-        } catch {
-          // Already updated locally
-        }
+      const supabase = getClient()
+      const { error } = await supabase
+        .from('tasks')
+        .update({ completed: task.completed })
+        .eq('id', id)
+
+      if (error) {
+        // Rollback
+        task.completed = !task.completed
       }
-      saveTasksLocal(this.tasks)
     },
 
     async deleteTask(id: string) {
+      // Optimistic delete
+      const backup = [...this.tasks]
       this.tasks = this.tasks.filter(t => t.id !== id)
 
-      if (this.useApi) {
-        try {
-          await $fetch(`/api/tasks/${id}`, { method: 'DELETE' })
-          return
-        } catch {
-          // Already removed locally
-        }
+      const supabase = getClient()
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        this.tasks = backup
       }
-      saveTasksLocal(this.tasks)
     },
 
     async updateTask(id: string, updates: Partial<Pick<Task, 'title' | 'notes' | 'category' | 'priority' | 'dueDate'>>) {
       const task = this.tasks.find(t => t.id === id)
       if (!task) return
 
+      // Optimistic update
+      const original = { ...task }
       Object.assign(task, updates)
 
-      if (this.useApi) {
-        try {
-          await $fetch(`/api/tasks/${id}`, {
-            method: 'PATCH',
-            body: updates,
-          })
-          return
-        } catch {
-          // Already updated locally
-        }
+      const rowUpdates: any = {}
+      if (updates.title !== undefined) rowUpdates.title = updates.title
+      if (updates.notes !== undefined) rowUpdates.notes = updates.notes
+      if (updates.category !== undefined) rowUpdates.category = updates.category
+      if (updates.priority !== undefined) rowUpdates.priority = updates.priority
+      if (updates.dueDate !== undefined) rowUpdates.due_date = updates.dueDate
+
+      const supabase = getClient()
+      const { error } = await supabase
+        .from('tasks')
+        .update(rowUpdates)
+        .eq('id', id)
+
+      if (error) {
+        Object.assign(task, original)
       }
-      saveTasksLocal(this.tasks)
     },
 
     setActiveCategory(category: Category | null) {
@@ -204,6 +235,14 @@ export const useTaskStore = defineStore('tasks', {
 
     setSearchQuery(query: string) {
       this.searchQuery = query
+    },
+
+    teardown() {
+      if (this._channel) {
+        const supabase = getClient()
+        supabase.removeChannel(this._channel)
+        this._channel = null
+      }
     },
   },
 })
